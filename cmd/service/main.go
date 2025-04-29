@@ -14,11 +14,14 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
-
-	db, err := sql.Open("postgres", cfg.DBURL)
+	cfg, err := config.Load()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to load config: %v", err)
+	}
+
+	db, err := sql.Open("postgres", cfg.DatabaseDSN())
+	if err != nil {
+		log.Fatalf("failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
@@ -27,12 +30,15 @@ func main() {
 	handler := httpdelivery.NewHandler(svc)
 
 	server := &http.Server{
-		Addr:    cfg.HTTPPort,
-		Handler: handler.Router(),
+		Addr:         cfg.AppPort,
+		Handler:      handler.Router(),
+		ReadTimeout:  cfg.GetReadTimeout(),
+		WriteTimeout: cfg.GetWriteTimeout(),
+		IdleTimeout:  cfg.GetIdleTimeout(),
 	}
 
-	log.Println("Starting server on", cfg.HTTPPort)
+	log.Printf("Starting %s on %s", cfg.ServiceName, cfg.AppPort)
 	if err := server.ListenAndServe(); err != nil {
-		log.Fatal(err)
+		log.Fatalf("server error: %v", err)
 	}
 }

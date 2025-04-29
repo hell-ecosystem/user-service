@@ -21,8 +21,8 @@ type Config struct {
 	WriteTimeout int `env:"APP_WRITE_TIMEOUT" envDefault:"10" validate:"required,gte=1"`
 	IdleTimeout  int `env:"APP_IDLE_TIMEOUT" envDefault:"120" validate:"required,gte=10"`
 
-	JWTSecret string `env:"JWT_SECRET" validate:"required"`
-	RedisAddr string `env:"REDIS_ADDR" envDefault:"localhost:6379"`
+	AuthJWTSecret string `env:"AUTH_JWT_SECRET" validate:"required"`
+	AuthRedisAddr string `env:"AUTH_REDIS_ADDR" envDefault:"localhost:6379"`
 
 	SentryDSN        string  `env:"SENTRY_DSN"`
 	SentryEnv        string  `env:"SENTRY_ENV" envDefault:"development"`

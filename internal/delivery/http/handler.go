@@ -8,6 +8,7 @@ import (
 
 	authinfra "github.com/hell-ecosystem/auth-service/pkg/auth/infra"
 	authsvc "github.com/hell-ecosystem/auth-service/pkg/auth/service"
+	"github.com/hell-ecosystem/user-service/internal/config"
 	"github.com/hell-ecosystem/user-service/internal/service"
 )
 
@@ -16,9 +17,9 @@ type Handler struct {
 	auth *authsvc.AuthService
 }
 
-func NewHandler(svc *service.Service) *Handler {
-	redis := authinfra.NewRedisTokenStore("localhost:6379") // TODO: вынести в конфиг
-	jwt := authinfra.NewJWTManager("my-secret")             // TODO: вынести в конфиг
+func NewHandler(cfg *config.Config, svc *service.Service) *Handler {
+	redis := authinfra.NewRedisTokenStore(cfg.AuthRedisAddr)
+	jwt := authinfra.NewJWTManager(cfg.AuthJWTSecret)
 	auth := authsvc.NewAuthService(jwt, redis, 15*time.Minute)
 	return &Handler{svc: svc, auth: auth}
 }

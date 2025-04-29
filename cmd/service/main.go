@@ -27,7 +27,7 @@ func main() {
 
 	repo := postgres.New(db)
 	svc := service.NewUserService(repo)
-	handler := httpdelivery.NewHandler(svc)
+	handler := httpdelivery.NewHandler(cfg, svc)
 
 	server := &http.Server{
 		Addr:         cfg.AppPort,

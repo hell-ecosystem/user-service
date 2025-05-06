@@ -25,13 +25,13 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	db := initPostgres(cfg)
+	db := mustInitPostgres(cfg)
 	defer db.Close()
 
-	auth := auth.InitAuth(cfg)
+	authModule := auth.InitAuth(cfg)
 	repo := postgres.New(db)
 	svc := service.NewUserService(repo)
-	handler := httpdelivery.NewHandler(svc, auth)
+	handler := httpdelivery.NewHandler(svc, authModule)
 
 	server := &http.Server{
 		Addr:         cfg.AppPort,
@@ -63,16 +63,18 @@ func main() {
 	}
 }
 
-func initPostgres(cfg *config.Config) *sql.DB {
+func mustInitPostgres(cfg *config.Config) *sql.DB {
 	db, err := sql.Open("postgres", cfg.DatabaseDSN())
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 
-	// Настройки пула подключений для highload
-	db.SetMaxOpenConns(100)          //TODO: вынести в cfg
-	db.SetMaxIdleConns(20)           //TODO: вынести в cfg
-	db.SetConnMaxLifetime(time.Hour) //TODO: вынести в cfg
+	db.SetMaxOpenConns(cfg.DBMaxOpenConns)
+	db.SetMaxIdleConns(cfg.DBMaxIdleConns)
+	db.SetConnMaxLifetime(cfg.GetConnMaxLifetime())
+
+	log.Printf("connected to postgres (maxConns=%d, idleConns=%d)\n",
+		cfg.DBMaxOpenConns, cfg.DBMaxIdleConns)
 
 	return db
 }

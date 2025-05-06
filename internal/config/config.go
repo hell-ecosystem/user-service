@@ -31,6 +31,10 @@ type Config struct {
 	OtelExporterEndpoint string `env:"OTEL_EXPORTER_OTLP_ENDPOINT" envDefault:"localhost:4318" validate:"required"`
 
 	ServiceName string `env:"SERVICE_NAME" envDefault:"user-service"`
+
+	DBMaxOpenConns       int `env:"DB_MAX_OPEN_CONNS" envDefault:"100"`
+	DBMaxIdleConns       int `env:"DB_MAX_IDLE_CONNS" envDefault:"20"`
+	DBConnMaxLifetimeSec int `env:"DB_CONN_MAX_LIFETIME" envDefault:"3600"`
 }
 
 var Conf Config

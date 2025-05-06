@@ -17,6 +17,10 @@ func (cfg Config) GetIdleTimeout() time.Duration {
 	return time.Duration(cfg.IdleTimeout) * time.Second
 }
 
+func (c *Config) GetConnMaxLifetime() time.Duration {
+	return time.Duration(c.DBConnMaxLifetimeSec) * time.Second
+}
+
 func (cfg Config) BuildPostgresDSN() string {
 	return fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=%s",

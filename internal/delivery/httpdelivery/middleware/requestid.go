@@ -1,4 +1,4 @@
-package httpdelivery
+package middleware
 
 import (
 	"context"

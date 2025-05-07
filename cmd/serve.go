@@ -41,7 +41,7 @@ var serveCmd = &cobra.Command{
 
 		server := &http.Server{
 			Addr:         cfg.AppPort,
-			Handler:      handler.Router(),
+			Handler:      handler,
 			ReadTimeout:  cfg.GetReadTimeout(),
 			WriteTimeout: cfg.GetWriteTimeout(),
 			IdleTimeout:  cfg.GetIdleTimeout(),

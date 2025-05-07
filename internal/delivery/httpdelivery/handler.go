@@ -1,11 +1,12 @@
+// internal/delivery/httpdelivery/handler.go
 package httpdelivery
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"strings"
 
+	middleware "github.com/hell-ecosystem/user-service/internal/delivery/httpdelivery/middleware"
 	"github.com/hell-ecosystem/user-service/internal/service"
 )
 
@@ -13,41 +14,32 @@ type Handler struct {
 	svc *service.Service
 }
 
-func NewHandler(svc *service.Service) *Handler {
-	return &Handler{svc: svc}
-}
+func NewHandler(svc *service.Service) http.Handler {
+	h := &Handler{svc}
 
-func (h *Handler) Router() http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("/users/me", h.withAuth(h.GetMe))
-	mux.Handle("/users/", h.withAuth(h.GetByID))
-	return mux
+	mux.Handle("/users/me", http.HandlerFunc(h.GetMe))
+	mux.Handle("/users/", http.HandlerFunc(h.GetByID))
+
+	return middleware.Chain(
+		mux,
+		middleware.RecoveryMiddleware,
+		middleware.RequestIDMiddleware,
+		middleware.LoggingMiddleware,
+		middleware.CORSMiddleware,
+	)
 }
 
-// withAuth проверяет метод и передаёт в f контекст с userID.
-// В продакшене здесь же вешается middleware для валидации JWT.
-func (h *Handler) withAuth(
-	f func(ctx context.Context, w http.ResponseWriter, r *http.Request),
-) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodPut {
-			WriteError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "метод не разрешён")
-			return
-		}
-		// В реальной логике из JWT-плагина gateway в контекст попадает "userID"
-		f(r.Context(), w, r)
-	}
-}
-
-// GetMe возвращает профиль текущего пользователя
-func (h *Handler) GetMe(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	userID, ok := ctx.Value("userID").(string)
-	if !ok || userID == "" {
+// GetMe возвращает профиль текущего пользователя.
+// Требует, чтобы middleware уже положил в контекст middleware.UserIDKey.
+func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
+	uid, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || uid == "" {
 		WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "неавторизованный запрос")
 		return
 	}
 
-	u, err := h.svc.GetByID(ctx, userID)
+	u, err := h.svc.GetByID(r.Context(), uid)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "пользователь не найден")
@@ -60,11 +52,16 @@ func (h *Handler) GetMe(ctx context.Context, w http.ResponseWriter, r *http.Requ
 	WriteSuccess(w, u)
 }
 
-// GetByID возвращает профиль пользователя по ID из пути /users/{id}
-func (h *Handler) GetByID(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+// GetByID возвращает профиль пользователя по ID из пути /users/{id}.
+// Здесь мы доверяем, что авторизация (X-User-ID → контекст) уже сделана,
+// но по сути GetByID доступен любому аутентифицированному клиенту.
+func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
+	// вы можете при желании проверить, что r.Context().Value(middleware.UserIDKey) не пуст,
+	// но если роутинг навешан через тот же RequireUserIDMiddleware — оно уже гарантировано.
+
 	id := strings.TrimPrefix(r.URL.Path, "/users/")
 
-	u, err := h.svc.GetByID(ctx, id)
+	u, err := h.svc.GetByID(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "пользователь не найден")

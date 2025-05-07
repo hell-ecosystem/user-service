@@ -215,13 +215,7 @@ migrations/
   go mod download
   ```
 
-- *Запустить миграции (например, с помощью migrate):*
-
-  ```bash
-  migrate -path migrations -database "$DATABASE_URL" up
-  ```
-
-- *Задать переменные окружения (пример ниже) и запустить сервис:*
+- *Задать переменные окружения:*
 
   ```bash
   export APP_PORT=":8081"
@@ -230,8 +224,18 @@ migrations/
   export DB_USER="postgres"
   export DB_PASS="password"
   export DB_NAME="userdb"
+  ```
 
-  go run cmd/main.go
+- *Запустить миграции:*
+
+  ```bash
+  go run cmd/service/main.go migrate
+  ```
+
+- *Запустить сервис:*
+
+  ```bash
+  go run cmd/service/main.go serve
   ```
 
 ## Переменные окружения

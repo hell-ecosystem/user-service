@@ -5,78 +5,34 @@ import (
 	"errors"
 
 	"github.com/hell-ecosystem/user-service/internal/model"
-
-	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/hell-ecosystem/user-service/internal/repository/postgres"
 )
 
-type UserRepository interface {
-	CreateUser(context.Context, *model.User) error
-	GetByEmail(context.Context, string) (*model.User, error)
-	GetByTelegramID(context.Context, int64) (*model.User, error)
+var ErrNotFound = errors.New("user not found")
+
+type Repository interface {
+	Create(ctx context.Context, u *model.User) error
+	GetByID(ctx context.Context, id string) (*model.User, error)
 }
 
 type Service struct {
-	repo UserRepository
+	repo Repository
 }
 
-func NewUserService(repo UserRepository) *Service {
+func New(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) RegisterUser(ctx context.Context, email, password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+// GetByID возвращает пользователя по ID
+func (s *Service) GetByID(ctx context.Context, id string) (*model.User, error) {
+	u, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return "", err
+		// если репозиторий вернул ErrNotFound — пробрасываем сервисную ErrNotFound
+		if errors.Is(err, postgres.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		// иначе — возвращаем любую другую ошибку как есть
+		return nil, err
 	}
-
-	user := &model.User{
-		ID:       uuid.New().String(),
-		Email:    &email,
-		Password: ptr(string(hash)),
-	}
-
-	err = s.repo.CreateUser(ctx, user)
-	if err != nil {
-		return "", err
-	}
-
-	return user.ID, nil
-}
-
-func (s *Service) AuthenticateUser(ctx context.Context, email, password string) (string, error) {
-	user, err := s.repo.GetByEmail(ctx, email)
-	if err != nil {
-		return "", err
-	}
-	if user.Password == nil {
-		return "", errors.New("password not set")
-	}
-	if err := bcrypt.CompareHashAndPassword([]byte(*user.Password), []byte(password)); err != nil {
-		return "", errors.New("invalid credentials")
-	}
-	return user.ID, nil
-}
-
-func (s *Service) AuthenticateTelegramUser(ctx context.Context, tgID int64) (string, error) {
-	user, err := s.repo.GetByTelegramID(ctx, tgID)
-	if err == nil {
-		return user.ID, nil
-	}
-
-	// Если пользователь не найден, создаём нового
-	newUser := &model.User{
-		ID:         uuid.New().String(),
-		TelegramID: &tgID,
-	}
-
-	if err := s.repo.CreateUser(ctx, newUser); err != nil {
-		return "", err
-	}
-
-	return newUser.ID, nil
-}
-
-func ptr[T any](v T) *T {
-	return &v
+	return u, nil
 }

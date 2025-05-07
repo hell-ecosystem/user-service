@@ -17,28 +17,20 @@ type Config struct {
 	DBName    string `env:"DB_NAME" validate:"required"`
 	DBSSLMode string `env:"DB_SSLMODE" envDefault:"disable" validate:"required,oneof=disable require"`
 
-	ReadTimeout  int `env:"APP_READ_TIMEOUT" envDefault:"10" validate:"required,gte=1"`
-	WriteTimeout int `env:"APP_WRITE_TIMEOUT" envDefault:"10" validate:"required,gte=1"`
-	IdleTimeout  int `env:"APP_IDLE_TIMEOUT" envDefault:"120" validate:"required,gte=10"`
-
-	AuthJWTSecret string `env:"AUTH_JWT_SECRET" validate:"required"`
-	AuthRedisAddr string `env:"AUTH_REDIS_ADDR" envDefault:"localhost:6379"`
-
-	SentryDSN        string  `env:"SENTRY_DSN"`
-	SentryEnv        string  `env:"SENTRY_ENV" envDefault:"development"`
-	SentrySampleRate float64 `env:"SENTRY_SAMPLE_RATE" envDefault:"1.0" validate:"gte=0,lte=1"`
-
-	OtelExporterEndpoint string `env:"OTEL_EXPORTER_OTLP_ENDPOINT" envDefault:"localhost:4318" validate:"required"`
-
-	ServiceName string `env:"SERVICE_NAME" envDefault:"user-service"`
+	// timeouts in seconds
+	ReadTimeoutSec  int `env:"APP_READ_TIMEOUT" envDefault:"10" validate:"gte=1"`
+	WriteTimeoutSec int `env:"APP_WRITE_TIMEOUT" envDefault:"10" validate:"gte=1"`
+	IdleTimeoutSec  int `env:"APP_IDLE_TIMEOUT" envDefault:"120" validate:"gte=10"`
 
 	DBMaxOpenConns       int `env:"DB_MAX_OPEN_CONNS" envDefault:"100"`
 	DBMaxIdleConns       int `env:"DB_MAX_IDLE_CONNS" envDefault:"20"`
 	DBConnMaxLifetimeSec int `env:"DB_CONN_MAX_LIFETIME" envDefault:"3600"`
 }
 
-var Conf Config
-var validate *validator.Validate
+var (
+	Conf     Config
+	validate *validator.Validate
+)
 
 func init() {
 	validate = validator.New()
@@ -46,10 +38,10 @@ func init() {
 
 func Load() (*Config, error) {
 	if err := env.Parse(&Conf); err != nil {
-		return nil, fmt.Errorf("failed to load env vars: %w", err)
+		return nil, fmt.Errorf("env parse: %w", err)
 	}
 	if err := validate.Struct(Conf); err != nil {
-		return nil, fmt.Errorf("config validation error: %w", err)
+		return nil, fmt.Errorf("config validation: %w", err)
 	}
 	return &Conf, nil
 }

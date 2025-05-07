@@ -10,8 +10,6 @@ import (
 
 	"github.com/hell-ecosystem/user-service/internal/config"
 	"github.com/hell-ecosystem/user-service/internal/db"
-
-	_ "github.com/lib/pq"
 )
 
 const migrationsDir = "migrations"

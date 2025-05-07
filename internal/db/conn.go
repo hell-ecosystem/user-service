@@ -1,3 +1,4 @@
+// internal/db/connect.go
 package db
 
 import (
@@ -6,40 +7,31 @@ import (
 	"time"
 
 	"github.com/hell-ecosystem/user-service/internal/config"
-	"github.com/hell-ecosystem/user-service/internal/retry"
 	_ "github.com/lib/pq"
 )
 
-// Connect открывает соединение с Postgres и пингует его,
-// пока БД не станет доступна (с экспоненциальным backoff + jitter).
+// Connect открывает sql.DB, настраивает его и пингует с retry.
+// Если после всех попыток соединение не установилось, возвращает ошибку.
 func Connect(cfg *config.Config) (*sql.DB, error) {
 	dsn := cfg.DatabaseDSN()
-	var db *sql.DB
-
-	// Ретраер для старта БД: бесконечный → ждём, пока контейнер не заведётся
-	r := retry.New(
-		retry.WithMaxAttempts(0), // 0 = бесконечно
-		retry.WithBackoffExponential(200*time.Millisecond, 1.5),
-		retry.WithJitter(0.1),
-		retry.RetryIf(retry.IsTransientSQLError), // ретраим только “транзиентные” SQL-ошибки
-	)
-
-	err := r.Do(context.Background(), func() error {
-		var err error
-		// открываем соединение (только один раз)
-		if db == nil {
-			db, err = sql.Open("postgres", dsn)
-			if err != nil {
-				return err
-			}
-			db.SetMaxOpenConns(cfg.DBMaxOpenConns)
-			db.SetMaxIdleConns(cfg.DBMaxIdleConns)
-			db.SetConnMaxLifetime(cfg.GetConnMaxLifetime())
-		}
-		// пингуем — если БД ещё не готова, вернётся ошибка и retry сработает
-		return db.PingContext(context.Background())
-	})
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
+		return nil, err
+	}
+	// Настраиваем пул
+	db.SetMaxOpenConns(cfg.DBMaxOpenConns)
+	db.SetMaxIdleConns(cfg.DBMaxIdleConns)
+	db.SetConnMaxLifetime(cfg.GetConnMaxLifetime())
+
+	// Пингуем с retry
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := config.DBRetry.Do(ctx, func() error {
+		return db.PingContext(ctx)
+	}); err != nil {
+		// если не удалось соединиться — закрываем и возвращаем ошибку
+		_ = db.Close()
 		return nil, err
 	}
 

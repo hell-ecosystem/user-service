@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
+	"strings"
 	"time"
 )
 
@@ -27,4 +29,17 @@ func (c *Config) DatabaseDSN() string {
 		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		c.DBUser, c.DBPass, c.DBHost, c.DBPort, c.DBName, c.DBSSLMode,
 	)
+}
+
+func (c *Config) GetLogLevel() slog.Level {
+	switch strings.ToUpper(c.LogLevel) {
+	case "DEBUG":
+		return slog.LevelDebug
+	case "WARN":
+		return slog.LevelWarn
+	case "ERROR":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }

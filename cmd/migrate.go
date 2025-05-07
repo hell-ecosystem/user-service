@@ -1,15 +1,16 @@
-// cmd/migrate.go
 package cmd
 
 import (
 	"fmt"
 	"log"
+	"log/slog"
 
 	"github.com/pressly/goose/v3"
 	"github.com/spf13/cobra"
 
 	"github.com/hell-ecosystem/user-service/internal/config"
 	"github.com/hell-ecosystem/user-service/internal/db"
+	"github.com/hell-ecosystem/user-service/internal/logger"
 )
 
 const migrationsDir = "migrations"
@@ -23,6 +24,12 @@ var migrateCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("config load: %v", err)
 		}
+
+		logger.InitLogger(cfg.GetLogLevel(), cfg.LogFormat)
+		slog.Info("logger initialized",
+			slog.String("level", cfg.LogLevel),
+			slog.String("format", cfg.LogFormat),
+		)
 
 		dbConn, err := db.Connect(cfg)
 		if err != nil {

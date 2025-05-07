@@ -3,7 +3,7 @@ package cmd
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +13,7 @@ import (
 	"github.com/hell-ecosystem/user-service/internal/config"
 	"github.com/hell-ecosystem/user-service/internal/db"
 	"github.com/hell-ecosystem/user-service/internal/delivery/httpdelivery"
+	"github.com/hell-ecosystem/user-service/internal/logger"
 	"github.com/hell-ecosystem/user-service/internal/repository/postgres"
 	"github.com/hell-ecosystem/user-service/internal/service"
 	"github.com/spf13/cobra"
@@ -25,13 +26,20 @@ var serveCmd = &cobra.Command{
 
 		cfg, err := config.Load()
 		if err != nil {
-			log.Fatalf("config load: %v", err)
+			slog.Error("config load failed", slog.Any("error", err))
+			os.Exit(1)
 		}
 
-		// подключаемся к БД (с retry внутри)
+		logger.InitLogger(cfg.GetLogLevel(), cfg.LogFormat)
+		slog.Info("logger initialized",
+			slog.String("level", cfg.LogLevel),
+			slog.String("format", cfg.LogFormat),
+		)
+
 		dbConn, err := db.Connect(cfg)
 		if err != nil {
-			log.Fatalf("db connect: %v", err)
+			slog.Error("db connect failed", slog.Any("error", err))
+			os.Exit(1)
 		}
 		defer dbConn.Close()
 
@@ -41,7 +49,7 @@ var serveCmd = &cobra.Command{
 
 		server := &http.Server{
 			Addr:         cfg.AppPort,
-			Handler:      handler.Router(),
+			Handler:      handler,
 			ReadTimeout:  cfg.GetReadTimeout(),
 			WriteTimeout: cfg.GetWriteTimeout(),
 			IdleTimeout:  cfg.GetIdleTimeout(),
@@ -51,19 +59,21 @@ var serveCmd = &cobra.Command{
 		defer stop()
 
 		go func() {
-			log.Printf("serving on %s", cfg.AppPort)
+			slog.Info("starting server", slog.String("addr", cfg.AppPort))
 			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Fatalf("serve error: %v", err)
+				slog.Error("serve error", slog.Any("error", err))
+				os.Exit(1)
 			}
 		}()
 
 		<-ctx.Done()
-		log.Println("shutting down…")
+		slog.Info("shutting down…")
 
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil {
-			log.Fatalf("shutdown error: %v", err)
+			slog.Error("shutdown failed", slog.Any("error", err))
+			os.Exit(1)
 		}
 	},
 }

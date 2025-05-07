@@ -2,7 +2,6 @@ package httpdelivery
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -25,44 +24,55 @@ func (h *Handler) Router() http.Handler {
 	return mux
 }
 
-// в проде сюда вставляется middleware, который заполняет Context значением userID
-func (h *Handler) withAuth(f func(ctx context.Context, w http.ResponseWriter, r *http.Request)) http.HandlerFunc {
+// withAuth проверяет метод и передаёт в f контекст с userID.
+// В продакшене здесь же вешается middleware для валидации JWT.
+func (h *Handler) withAuth(
+	f func(ctx context.Context, w http.ResponseWriter, r *http.Request),
+) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodPut {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			WriteError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "метод не разрешён")
 			return
 		}
-		// ctx := context.WithValue(r.Context(), "userID", ...)
+		// В реальной логике из JWT-плагина gateway в контекст попадает "userID"
 		f(r.Context(), w, r)
 	}
 }
 
+// GetMe возвращает профиль текущего пользователя
 func (h *Handler) GetMe(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	userID := ctx.Value("userID").(string)
-	u, err := h.svc.GetByID(ctx, userID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+	userID, ok := ctx.Value("userID").(string)
+	if !ok || userID == "" {
+		WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "неавторизованный запрос")
 		return
 	}
-	json.NewEncoder(w).Encode(u)
+
+	u, err := h.svc.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "пользователь не найден")
+		} else {
+			WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "внутренняя ошибка сервера")
+		}
+		return
+	}
+
+	WriteSuccess(w, u)
 }
 
+// GetByID возвращает профиль пользователя по ID из пути /users/{id}
 func (h *Handler) GetByID(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	// Выдергиваем ID из URL
 	id := strings.TrimPrefix(r.URL.Path, "/users/")
 
 	u, err := h.svc.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
-			http.Error(w, "user not found", http.StatusNotFound)
+			WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "пользователь не найден")
 		} else {
-			http.Error(w, "internal server error", http.StatusInternalServerError)
+			WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "внутренняя ошибка сервера")
 		}
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(u); err != nil {
-		http.Error(w, "failed to encode response", http.StatusInternalServerError)
-	}
+	WriteSuccess(w, u)
 }

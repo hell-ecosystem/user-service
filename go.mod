@@ -5,6 +5,7 @@ go 1.24.1
 require (
 	github.com/caarlos0/env/v9 v9.0.0
 	github.com/go-playground/validator/v10 v10.26.0
+	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/pressly/goose/v3 v3.24.3
 	github.com/spf13/cobra v1.9.1

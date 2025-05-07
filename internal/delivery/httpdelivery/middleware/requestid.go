@@ -20,3 +20,11 @@ func RequestIDMiddleware(next http.Handler) http.Handler {
 
 // Из других мест можно достать ID так:
 //   id, _ := r.Context().Value(ctxKeyRequestID{}).(string)
+
+// Извлечь requestID из контекста
+func GetRequestID(ctx context.Context) string {
+	if v := ctx.Value(ctxKeyRequestID{}); v != nil {
+		return v.(string)
+	}
+	return ""
+}

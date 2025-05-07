@@ -5,34 +5,26 @@ import (
 	"time"
 )
 
-func (cfg Config) GetReadTimeout() time.Duration {
-	return time.Duration(cfg.ReadTimeout) * time.Second
+func (c *Config) GetReadTimeout() time.Duration {
+	return time.Duration(c.ReadTimeoutSec) * time.Second
 }
 
-func (cfg Config) GetWriteTimeout() time.Duration {
-	return time.Duration(cfg.WriteTimeout) * time.Second
+func (c *Config) GetWriteTimeout() time.Duration {
+	return time.Duration(c.WriteTimeoutSec) * time.Second
 }
 
-func (cfg Config) GetIdleTimeout() time.Duration {
-	return time.Duration(cfg.IdleTimeout) * time.Second
+func (c *Config) GetIdleTimeout() time.Duration {
+	return time.Duration(c.IdleTimeoutSec) * time.Second
 }
 
 func (c *Config) GetConnMaxLifetime() time.Duration {
 	return time.Duration(c.DBConnMaxLifetimeSec) * time.Second
 }
 
-func (cfg Config) BuildPostgresDSN() string {
+// Data Source Name for postgres
+func (c *Config) DatabaseDSN() string {
 	return fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		cfg.DBUser,
-		cfg.DBPass,
-		cfg.DBHost,
-		cfg.DBPort,
-		cfg.DBName,
-		cfg.DBSSLMode,
+		c.DBUser, c.DBPass, c.DBHost, c.DBPort, c.DBName, c.DBSSLMode,
 	)
-}
-
-func (cfg Config) DatabaseDSN() string {
-	return cfg.BuildPostgresDSN()
 }

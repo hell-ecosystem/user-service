@@ -1,7 +1,6 @@
 CREATE TABLE IF NOT EXISTS users (
-	id UUID PRIMARY KEY,
-	email TEXT UNIQUE,
-	password_hash TEXT,
-	telegram_id BIGINT UNIQUE,
-	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id UUID PRIMARY KEY,
+  email TEXT UNIQUE,
+  telegram_id BIGINT UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

@@ -3,11 +3,12 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/hell-ecosystem/user-service/internal/model"
-
-	_ "github.com/lib/pq"
 )
+
+var ErrNotFound = errors.New("user not found")
 
 type Repository struct {
 	db *sql.DB
@@ -17,21 +18,25 @@ func New(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) CreateUser(ctx context.Context, u *model.User) error {
-	_, err := r.db.ExecContext(ctx, `INSERT INTO users (id, email, password_hash, telegram_id, created_at) VALUES ($1, $2, $3, $4, NOW())`, u.ID, u.Email, u.Password, u.TelegramID)
+func (r *Repository) Create(ctx context.Context, u *model.User) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO users (id, email, telegram_id, created_at)
+		VALUES ($1, $2, $3, $4)
+	`, u.ID, u.Email, u.TelegramID, u.CreatedAt)
 	return err
 }
 
-func (r *Repository) GetByEmail(ctx context.Context, email string) (*model.User, error) {
-	row := r.db.QueryRowContext(ctx, `SELECT id, email, password_hash, telegram_id, created_at FROM users WHERE email = $1`, email)
+func (r *Repository) GetByID(ctx context.Context, id string) (*model.User, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, email, telegram_id, created_at
+		FROM users WHERE id = $1
+	`, id)
 	var u model.User
-	err := row.Scan(&u.ID, &u.Email, &u.Password, &u.TelegramID, &u.CreatedAt)
-	return &u, err
-}
-
-func (r *Repository) GetByTelegramID(ctx context.Context, tgID int64) (*model.User, error) {
-	row := r.db.QueryRowContext(ctx, `SELECT id, email, password_hash, telegram_id, created_at FROM users WHERE telegram_id = $1`, tgID)
-	var u model.User
-	err := row.Scan(&u.ID, &u.Email, &u.Password, &u.TelegramID, &u.CreatedAt)
-	return &u, err
+	if err := row.Scan(&u.ID, &u.Email, &u.TelegramID, &u.CreatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return &u, nil
 }

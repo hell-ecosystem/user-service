@@ -25,8 +25,11 @@ var migrateCmd = &cobra.Command{
 			log.Fatalf("config load: %v", err)
 		}
 
-		logger.InitLogger(cfg.GetLogLevel())
-		slog.Info("running migrations", slog.String("dir", migrationsDir))
+		logger.InitLogger(cfg.GetLogLevel(), cfg.LogFormat)
+		slog.Info("logger initialized",
+			slog.String("level", cfg.LogLevel),
+			slog.String("format", cfg.LogFormat),
+		)
 
 		dbConn, err := db.Connect(cfg)
 		if err != nil {

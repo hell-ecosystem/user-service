@@ -13,7 +13,8 @@ import (
 type Config struct {
 	AppPort string `env:"APP_PORT" envDefault:":8080" validate:"required"`
 
-	LogLevel string `env:"LOG_LEVEL" envDefault:"INFO" validate:"oneof=DEBUG INFO WARN ERROR"`
+	LogLevel  string `env:"LOG_LEVEL" envDefault:"INFO" validate:"oneof=DEBUG INFO WARN ERROR"`
+	LogFormat string `env:"LOG_FORMAT" envDefault:"json" validate:"required,oneof=text json"`
 
 	DBHost    string `env:"DB_HOST" validate:"required,hostname|ip"`
 	DBPort    string `env:"DB_PORT" envDefault:"5432" validate:"required,numeric"`

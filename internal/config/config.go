@@ -37,6 +37,16 @@ var (
 
 // ретраи
 var (
+	// ретраер ТОЛЬКО для начального подключения к БД:
+	// - без фильтра — повторяем любую ошибку
+	// - большое число попыток, но на самом деле ограничимся контекстом
+	DBConnectRetry = retry.New(
+		retry.WithMaxAttempts(1000), // достаточно много, контекст остановит раньше
+		retry.WithBackoffExponential(500*time.Millisecond, 2.0),
+		retry.WithJitter(0.1),
+		// note: нет RetryIf — значит любые err → retry
+	)
+
 	// для работы с БД
 	DBRetry = retry.New(
 		retry.WithMaxAttempts(5),

@@ -2,9 +2,12 @@ package config
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/caarlos0/env/v9"
 	"github.com/go-playground/validator/v10"
+
+	"github.com/hell-ecosystem/user-service/internal/retry"
 )
 
 type Config struct {
@@ -30,6 +33,24 @@ type Config struct {
 var (
 	Conf     Config
 	validate *validator.Validate
+)
+
+// ретраи
+var (
+	// для работы с БД
+	DBRetry = retry.New(
+		retry.WithMaxAttempts(5),
+		retry.WithBackoffExponential(100*time.Millisecond, 2.0),
+		retry.WithJitter(0.1),
+		retry.RetryIf(retry.IsTransientSQLError),
+	)
+
+	// для внешних HTTP-клиентов
+	APIRetry = retry.New(
+		retry.WithMaxAttempts(3),
+		retry.WithBackoffExponential(200*time.Millisecond, 1.5),
+		retry.RetryIf(retry.Is5xxHTTPError),
+	)
 )
 
 func init() {

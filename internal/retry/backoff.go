@@ -25,7 +25,7 @@ func (b *ExponentialBackoff) Next(attempt int) time.Duration {
 }
 
 // WithJitter добавляет ±jitterFactor (например 0.2) разброс к базовой задержке.
-func WithJitter(base time.Duration, jitterFactor float64) time.Duration {
+func applyJitter(base time.Duration, jitterFactor float64) time.Duration {
 	// случайно в диапазоне [1-jitterFactor, 1+jitterFactor]
 	delta := (rand.Float64()*2 - 1) * jitterFactor
 	return time.Duration(float64(base) * (1 + delta))

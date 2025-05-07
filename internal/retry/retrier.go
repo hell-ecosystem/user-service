@@ -41,7 +41,7 @@ func (r *Retrier) Do(ctx context.Context, fn func() error) error {
 
 		// считаем задержку: экспонента + джиттер
 		delay := r.Backoff.Next(i)
-		delay = WithJitter(delay, r.JitterFactor)
+		delay = applyJitter(delay, r.JitterFactor)
 
 		select {
 		case <-time.After(delay):

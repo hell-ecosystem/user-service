@@ -1,101 +1,75 @@
+// internal/delivery/httpdelivery/handler.go
 package httpdelivery
 
 import (
-	"context"
-	"encoding/json"
+	"errors"
 	"net/http"
-	"strconv"
+	"strings"
 
-	authsvc "github.com/hell-ecosystem/auth-service/pkg/auth/service"
+	middleware "github.com/hell-ecosystem/user-service/internal/delivery/httpdelivery/middleware"
 	"github.com/hell-ecosystem/user-service/internal/service"
 )
 
 type Handler struct {
-	svc  *service.Service
-	auth *authsvc.AuthService
+	svc *service.Service
 }
 
-func NewHandler(svc *service.Service, auth *authsvc.AuthService) *Handler {
-	return &Handler{svc: svc, auth: auth}
-}
+func NewHandler(svc *service.Service) http.Handler {
+	h := &Handler{svc}
 
-func (h *Handler) Router() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/register", h.withPost(h.Register))
-	mux.HandleFunc("/login", h.withPost(h.Login))
-	mux.HandleFunc("/telegram", h.withPost(h.TelegramLogin))
-	return mux
+	mux.Handle("/users/me", http.HandlerFunc(h.GetMe))
+	mux.Handle("/users/", http.HandlerFunc(h.GetByID))
+
+	return middleware.Chain(
+		mux,
+		middleware.RecoveryMiddleware,
+		middleware.RequestIDMiddleware,
+		middleware.LoggingMiddleware,
+		middleware.CORSMiddleware,
+	)
 }
 
-func (h *Handler) withPost(f func(ctx context.Context, w http.ResponseWriter, r *http.Request)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
+// GetMe возвращает профиль текущего пользователя.
+// Требует, чтобы middleware уже положил в контекст middleware.UserIDKey.
+func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
+	uid, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || uid == "" {
+		WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "неавторизованный запрос")
+		return
+	}
+
+	u, err := h.svc.GetByID(r.Context(), uid)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "пользователь не найден")
+		} else {
+			WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "внутренняя ошибка сервера")
 		}
-		f(r.Context(), w, r)
+		return
 	}
+
+	WriteSuccess(w, u)
 }
 
-type creds struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
+// GetByID возвращает профиль пользователя по ID из пути /users/{id}.
+// Здесь мы доверяем, что авторизация (X-User-ID → контекст) уже сделана,
+// но по сути GetByID доступен любому аутентифицированному клиенту.
+func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
+	// вы можете при желании проверить, что r.Context().Value(middleware.UserIDKey) не пуст,
+	// но если роутинг навешан через тот же RequireUserIDMiddleware — оно уже гарантировано.
 
-func (h *Handler) Register(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	var c creds
-	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-	userID, err := h.svc.RegisterUser(ctx, c.Email, c.Password)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	accessToken, err := h.auth.Login(ctx, userID, "user")
-	if err != nil {
-		http.Error(w, "token generation failed", http.StatusInternalServerError)
-		return
-	}
-	w.Write([]byte(accessToken))
-}
+	id := strings.TrimPrefix(r.URL.Path, "/users/")
 
-func (h *Handler) Login(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	var c creds
-	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-	userID, err := h.svc.AuthenticateUser(ctx, c.Email, c.Password)
+	u, err := h.svc.GetByID(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		if errors.Is(err, service.ErrNotFound) {
+			WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "пользователь не найден")
+		} else {
+			WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "внутренняя ошибка сервера")
+		}
 		return
 	}
-	accessToken, err := h.auth.Login(ctx, userID, "user")
-	if err != nil {
-		http.Error(w, "token generation failed", http.StatusInternalServerError)
-		return
-	}
-	w.Write([]byte(accessToken))
-}
 
-func (h *Handler) TelegramLogin(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	tgIDRaw := r.URL.Query().Get("id")
-	tgID, err := strconv.ParseInt(tgIDRaw, 10, 64)
-	if err != nil {
-		http.Error(w, "invalid telegram id", http.StatusBadRequest)
-		return
-	}
-	userID, err := h.svc.AuthenticateTelegramUser(ctx, tgID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	accessToken, err := h.auth.Login(ctx, userID, "user")
-	if err != nil {
-		http.Error(w, "token generation failed", http.StatusInternalServerError)
-		return
-	}
-	w.Write([]byte(accessToken))
+	WriteSuccess(w, u)
 }

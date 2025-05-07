@@ -1,44 +1,43 @@
+// cmd/migrate.go
 package cmd
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 
-	_ "github.com/lib/pq"
 	"github.com/pressly/goose/v3"
 	"github.com/spf13/cobra"
 
 	"github.com/hell-ecosystem/user-service/internal/config"
+	"github.com/hell-ecosystem/user-service/internal/db"
+
+	_ "github.com/lib/pq"
 )
 
-const (
-	// migrationsDir — жёстко зашитый путь к папке с миграциями
-	migrationsDir = "migrations"
-)
+const migrationsDir = "migrations"
 
 var migrateCmd = &cobra.Command{
 	Use:   "migrate",
-	Short: "make migrations",
+	Short: "apply database migrations",
 	Run: func(cmd *cobra.Command, args []string) {
 
 		cfg, err := config.Load()
 		if err != nil {
-			log.Fatalf("failed to load config: %v", err)
+			log.Fatalf("config load: %v", err)
 		}
 
-		db, err := sql.Open("postgres", cfg.DatabaseDSN())
+		dbConn, err := db.Connect(cfg)
 		if err != nil {
-			log.Fatalf("не удалось подключиться к БД: %v", err)
+			log.Fatalf("db connect: %v", err)
 		}
-		defer db.Close()
+		defer dbConn.Close()
 
 		goose.SetDialect("postgres")
-		if err := goose.Up(db, migrationsDir); err != nil {
-			log.Fatalf("goose up не удалось выполнить: %v", err)
+		if err := goose.Up(dbConn, migrationsDir); err != nil {
+			log.Fatalf("migrations failed: %v", err)
 		}
 
-		fmt.Println("Миграции успешно применены")
+		fmt.Println("migrations applied successfully")
 	},
 }
 

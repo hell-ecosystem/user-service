@@ -1,4 +1,3 @@
-// internal/delivery/httpdelivery/handler.go
 package httpdelivery
 
 import (

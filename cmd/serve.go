@@ -1,4 +1,3 @@
-// cmd/serve.go
 package cmd
 
 import (

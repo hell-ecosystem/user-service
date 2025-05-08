@@ -3,7 +3,6 @@ package httpdelivery
 import (
 	"errors"
 	"net/http"
-	"strings"
 
 	middleware "github.com/hell-ecosystem/user-service/internal/delivery/httpdelivery/middleware"
 	"github.com/hell-ecosystem/user-service/internal/service"
@@ -18,7 +17,7 @@ func NewHandler(svc *service.Service) http.Handler {
 
 	mux := http.NewServeMux()
 	mux.Handle("/users/me", http.HandlerFunc(h.GetMe))
-	mux.Handle("/users/", http.HandlerFunc(h.GetByID))
+	mux.Handle("/users", http.HandlerFunc(h.GetByID))
 
 	return middleware.Chain(
 		mux,
@@ -51,14 +50,13 @@ func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
 	WriteSuccess(w, u)
 }
 
-// GetByID возвращает профиль пользователя по ID из пути /users/{id}.
-// Здесь мы доверяем, что авторизация (X-User-ID → контекст) уже сделана,
-// но по сути GetByID доступен любому аутентифицированному клиенту.
+// GetByID возвращает профиль пользователя по ID из заголовка X-User-ID.
 func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
-	// вы можете при желании проверить, что r.Context().Value(middleware.UserIDKey) не пуст,
-	// но если роутинг навешан через тот же RequireUserIDMiddleware — оно уже гарантировано.
-
-	id := strings.TrimPrefix(r.URL.Path, "/users/")
+	id := r.Header.Get("X-User-ID")
+	if id == "" {
+		WriteError(w, http.StatusBadRequest, "MISSING_USER_ID", "заголовок X-User-ID не указан")
+		return
+	}
 
 	u, err := h.svc.GetByID(r.Context(), id)
 	if err != nil {

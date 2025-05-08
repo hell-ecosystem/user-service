@@ -10,7 +10,7 @@ CRUD-сервис для работы с профилем пользовател
 - [Формат ответов API](#формат-ответов-api)  
 - [Эндпоинты](#эндпоинты)  
   - [GET /users/me](#get-usersme)  
-  - [GET /users/{id}](#get-usersid)  
+  - [GET /users](#get-users)  
 - [Архитектура](#архитектура)  
 - [Миграции](#миграции)  
 - [Запуск](#запуск)  
@@ -106,14 +106,14 @@ curl -H "Authorization: Bearer <access_token>" \
   }
   ```
   
-### GET /users/{id}
+### GET /users
 
-Получить профиль пользователя по ID.
+Получить профиль пользователя по ID, передаваемому в заголовке `X-User-ID`.
 
 **Пример запроса:**
 
 ```bash
-curl http://localhost:8081/users/d290f1ee-6c54-4b01-90e6-d701748f0851
+curl -H "X-User-ID: d290f1ee-6c54-4b01-90e6-d701748f0851" http://localhost:8081/users
 ```
 
 **Ответы:**
@@ -128,6 +128,18 @@ curl http://localhost:8081/users/d290f1ee-6c54-4b01-90e6-d701748f0851
       "email": "user@example.com",
       "telegram_id": null,
       "created_at": "2025-05-07T12:34:56Z"
+    }
+  }
+  ```
+
+- 400 Bad Request
+
+  ```json
+  {
+    "success": false,
+    "error": {
+      "code":    "MISSING_USER_ID",
+      "message": "заголовок X-User-ID не указан"
     }
   }
   ```
